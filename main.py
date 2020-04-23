@@ -19,7 +19,7 @@ font = pygame.font.SysFont("consolas", 16)
 
 file_name = "scoreboard.txt"
 
-# Check (, create) and oped score file
+# Checks (and creates if necessary) and opens score file
 
 score = 0
 
@@ -36,35 +36,29 @@ finally:
     HI = int(scoreboard)
     a.close()
 
+# Scenes and Gui
 
-# Scenes
+'''
+# Play
+# - pause
+#   - return to game
+#   - options
+#   - initial screen
+#   - quit
 
-class GUI:
+# Ranking
+# - back
 
-    # Play
-    # - pause
-    #   - return to game
-    #   - options
-    #   - initial screen
-    #   - quit
+# Options
+# - resolution
+# - sound?
+# - back
 
-    # Racking
-    # - back
+# Credits
+# - back
 
-    # Options
-    # - resolution
-    # - sound?
-    # - back
-
-    # Credits
-    # - back
-
-    # Quit
-
-    def run_game(self):
-        pass
-
-    pass
+# Quit
+'''
 
 
 # Apple
@@ -73,7 +67,7 @@ class Apple:
     pos: tuple
     size: int
 
-    def __init__(self, size=8, color: tuple = (255, 0, 0)):
+    def __init__(self, size=resolution//20, color: tuple = (255, 0, 0)):
         self.skin = pygame.Surface((size, size))
         self.skin.fill(color)
         self.size = size
@@ -96,9 +90,8 @@ class Snake:
     body: list
     direction: tuple
 
-    def __init__(self, body_size=3, size=8, color: tuple = (255, 255, 255)):
-        self.bodySize = body_size
-        # self.color = color
+    def __init__(self, size=resolution//20, color: tuple = (255, 255, 255)):
+        self.color = color
         self.size = size
         self.skin = pygame.Surface((size, size))
         self.skin.fill(color)
@@ -133,18 +126,33 @@ class Snake:
     #     pass
     def edge_collision(self):
         global resolution
-        for coordinate in self.head:
-            if coordinate in (-8, resolution):
-                self.spawn()
+        # Deadly Edge Mode
+        # for coordinate in self.head:
+        #     if coordinate in (-self.size, resolution):
+        #         self.spawn()
+        # The warped edge mode still has flaws...
+        # Warped Edge Mode
+        if self.head[0] == -self.size:
+            self.head = resolution-self.size, self.head[1]  # Se eu
+        elif self.head[0] == resolution:
+            self.head = 0, self.head[1]
+
+        if self.head[1] == -self.size:
+            self.head = self.head[0], resolution-self.size
+        elif self.head[1] == resolution:
+            self.head = self.head[0], 0
 
     # Movement
 
     def move_body(self):
+        # The movement of the body is to follow the head; so, when the head moves, the second square of the snake (which
+        # is the first of the body) assumes the position of the head, and the second of the body, the first, and so on
+
         """
-        The movement of the body is to follow the head; so, when the head moves, the second square of the snake (which
-        is the first of the body) assumes the position of the head, and the second of the body, the first, and so on
+
         :return: None
         """
+
         # self.body = [self.body[0]] + self[0:-2]  # e.g. [a, b, c, d, e] -> [a, a, b, c, d]
         for k, pos in enumerate(self.body[-2::-1]):  # Its take from the penultimate element to the first
             self.body[-k - 1] = pos  # body[-1] <- body[-2] ; body[-2] <- body[-3] ; ...
@@ -158,7 +166,8 @@ class Snake:
 
     def move_direction(self, key: int):
         """
-        Take a key index and
+        Take a key index to get the name of key, then call the Snake method with the same name
+
         :param key: A integer that represent the key pressed
         :return: None
         """
@@ -180,12 +189,8 @@ class Snake:
         if self.direction != (-1, 0):
             self.direction = (1, 0)
 
-    def space(self):
-        global pauseGame
-        pauseGame = not pauseGame
-        print("pause/start")
-
     def render(self, canvas: pygame.display.set_mode):
+
         canvas.blit(self.skin, self.head)
         for pos in self.body:
             canvas.blit(self.skin, pos)
@@ -214,8 +219,11 @@ while runGame:
         if event.type == pygame.KEYDOWN:  # If a key is pressed
             try:  # Because not all keys are being used
                 snake.move_direction(event.key)
-            except SyntaxError:
+            except AttributeError:
                 pass
+            if pygame.key.name(event.key) == "space":
+                pauseGame = not pauseGame
+                print("pause" if pauseGame else "play")
 
     if not pauseGame:
         # Move
