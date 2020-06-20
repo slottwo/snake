@@ -22,12 +22,14 @@ def iterable(obj):
         return True
 
 
-# Boot
+# Boot and game proprieties
 pygame.init()
-clock = pygame.time.Clock()
+clock = pygame.time.Clock()  # Game Tick Speed controller
+FPS = 12
+initial_difficult = 1
 
 # Window and Canvas Properties
-resolution = 320
+resolution = 480  # Use numbers in form: 160x
 game_size = 2  # 1: 16 blocks; 2: 32 blocks; 3: 48 blocks...
 
 
@@ -94,6 +96,7 @@ load_score()
 class Apple:
     pos: tuple
     size: int
+    canvas: pygame.Surface = screen
 
     def __init__(self, size=block_size(), color: tuple = (255, 0, 0)):
         self.color = color
@@ -101,9 +104,12 @@ class Apple:
         self.skin.fill(color)
         self.size = size
 
-    def new_apple(self, canvas: pygame.Surface = screen):
-        self.pos = (randint(0, (canvas.get_width() // self.size - 1)) * self.size,
-                    randint(0, (canvas.get_height() // self.size - 1)) * self.size)
+    def set_canvas(self, canvas: pygame.Surface = screen):
+        self.canvas = canvas
+
+    def new_apple(self):
+        self.pos = (randint(0, (self.canvas.get_width() // self.size - 1)) * self.size,
+                    randint(0, (self.canvas.get_height() // self.size - 1)) * self.size)
         # Range of randint: 0 to screen size - apple size, but with step equal size
 
     def resize(self):
@@ -127,14 +133,13 @@ class Snake:
         self.skin = pygame.Surface((size, size))
         self.skin.fill(color)
 
-    def spawn(self, canvas: pygame.Surface = screen):
+    def spawn(self, x_ratio: float = 2, y_ratio: float = 2, canvas: pygame.Surface = screen):
         global score, HI
         if score > HI:
             HI = score
         score = 0
-        self.head = (canvas.get_width() // 2, canvas.get_height() // 2)  # tuple(map(lambda x: x//2, winSize))
-        self.body = [(self.head[0] - self.size, self.head[1]),
-                     (self.head[0] - self.size * 2, self.head[1])]
+        self.head = canvas.get_width() // x_ratio, canvas.get_height() // y_ratio  # tuple(map(lambda x: x//2, winSize))
+        self.body = [(self.head[0] - self.size, self.head[1]), (self.head[0] - self.size * 2, self.head[1])]
         self.direction = (1, 0)
 
     def resize(self):
@@ -144,11 +149,12 @@ class Snake:
 
     # Collisions
 
-    def apple_collision(self, a: Apple):
+    def apple_collision(self, a: Apple, score_update=True):
         global score
         for pos in [self.head] + list(self.body):
             if pos == a.pos:
-                score += 1
+                if score_update:
+                    score += 1
                 self.body.append(self.body[-1])
                 a.new_apple()
 
@@ -161,31 +167,42 @@ class Snake:
     #     #     self.spawn()
     #     pass
     
-    def edge_collision(self):
-        global resolution
+    def edge_collision(self, canvas_size: tuple = (resolution, resolution)):
         # Deadly Edge Mode
         # for coordinate in self.head:
         #     if coordinate in (-self.size, resolution):
         #         self.spawn()
         # The warped edge mode still has flaws...
+
         # Warped Edge Mode
         if self.head[0] == -self.size:
-            self.head = resolution - self.size, self.head[1]  # Se eu
-        elif self.head[0] == resolution:
+            self.head = canvas_size[0] - self.size, self.head[1]  # Se eu
+        elif self.head[0] == canvas_size[0]:
             self.head = 0, self.head[1]
 
         if self.head[1] == -self.size:
-            self.head = self.head[0], resolution - self.size
-        elif self.head[1] == resolution:
+            self.head = self.head[0], canvas_size[1] - self.size
+        elif self.head[1] == canvas_size[1]:
             self.head = self.head[0], 0
 
     # Movement
 
-    def move_body(self):
-        # The movement of the body is to follow the head; so, when the head moves, the second square of the snake (which
-        # is the first of the body) assumes the position of the head, and the second of the body, the first, and so on
+    def go_to_apple(self, a: Apple):
+        if self.head[0] > a.pos[0]:
+            self.left()
+        if self.head[0] < a.pos[0]:
+            self.right()
+        if self.head[0] == a.pos[0]:
+            if self.head[1] > a.pos[1]:
+                self.up()
+            if self.head[1] < a.pos[1]:
+                self.down()
 
+    def move_body(self):
         """
+        The movement of the body is to follow the head; so, when the head moves, the second square of the snake (which
+        is the first of the body) assumes the position of the head, and the second of the body, the first, and so on
+
         :return: None
         """
 
@@ -238,38 +255,13 @@ class Snake:
 # Objects instancing
 
 snake = Snake(color=(0, 255, 0))
-
 apple = Apple()
+phantomSnake = Snake(color=(0, 255, 0))
+phantomApple = Apple()
+
 
 # GUI and Scenes
-"""
-Play
-: run game
-- pause
-  - return to game
-  - options
-  - initial screen
-  - quit
-
-Ranking
-: display ranking 
-- back
-
-Options
-- rule games
-- resolution
-- language
-- sound?
-- back
-
-Credits
-- back
-
-Quit
-"""
-
-
-def render(*objects, background=(0, 0, 0), canvas=screen):
+def render(*objects, background=(0, 0, 0), canvas=screen, canvas_pos=(0, 0)):
 
     """
     Draws and animates objects, sprites and texts on the screen, cleaning and updating
@@ -277,16 +269,19 @@ def render(*objects, background=(0, 0, 0), canvas=screen):
     :param objects: objects to be drawn, it can be a iterable type with objects drawable
     :param background: background color
     :param canvas: window or surface where the objects will be "blitted" (drawn)
+    :param canvas_pos: Canvas position in the screen
     :return: None
     """
 
     if canvas != screen:
-        screen.blit(canvas, (0, 0))
+        screen.blit(canvas, canvas_pos)
 
     canvas.fill(background)  # Clears the screen at each frame
 
     for obj in objects:
-        if iterable(obj):
+        if type(obj) == dict:
+            pygame.draw.rect(canvas, obj['color'], obj['rect'])
+        elif iterable(obj):
             for o in obj:
                 o.draw(canvas)
         else:
@@ -332,7 +327,7 @@ class Button:
         self.color = color
         self.label = Label(label, (x, y))
         self.event_click = evt_clk
-        # self.event_highlight = None
+        self.event_highlight = self.event_highlight
 
     def draw(self, canvas: pygame.Surface):
         pygame.draw.rect(canvas, self.color, self.rect)
@@ -364,9 +359,14 @@ class Button:
             self.event_highlight(False)
 
 
-# Menu
+# Menus
 def main_menu():
-    menu = pygame.Surface((resolution, resolution))
+    menu_screen = pygame.Surface((resolution, resolution))
+
+    # Animation
+
+    phantomSnake.spawn(x_ratio=2, y_ratio=4/3)
+    phantomApple.new_apple()
 
     # Title
     title1 = Label("Snake", (resolution * 4//32, resolution * 3//32), main_font(4),
@@ -378,25 +378,23 @@ def main_menu():
     playBtn = Button(resolution * 4//32, resolution * 12//32, 56, 16, label="> Play", evt_clk=game)
     optionsBtn = Button(resolution * 4//32, resolution * 14//32, 80, 16, label="> Options", evt_clk=options)
     creditsBtn = Button(resolution * 4//32, resolution * 16//32, 80, 16, label="> Credits", evt_clk=credits_game)
-    exitBtn = Button(resolution * 4//32, resolution * 18//32, 56, 16, label="> Exit", evt_clk=sys.exit)
+    exitBtn = Button(resolution * 4//32, resolution * 18//32, 56, 16, label="> Exit", evt_clk=exit_game)
 
     buttons = (playBtn, optionsBtn, creditsBtn, exitBtn)
 
-    # arrowCursor ...
-
+    # Mouse variable declarations
+    mx, my = (0, 0)
     mClick = False
     while True:
         # FPS
-        clock.tick(6)
+        clock.tick(FPS*5)
 
         # Inputting
         for event in pygame.event.get():
 
             # Exit
             if event.type == pygame.QUIT:
-                save_score()
-                pygame.quit()
-                sys.exit()
+                exit_game()
 
             # Mouse
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -408,58 +406,195 @@ def main_menu():
         # Collision
         for button in buttons:
             button.collision(mx, my, mClick)
+        phantomSnake.edge_collision()
+        phantomSnake.apple_collision(phantomApple, False)
+        phantomSnake.self_collision()
+
+        # Animation
+
+        phantomSnake.go_to_apple(phantomApple)
+        phantomSnake.move_head()
 
         # Render
-        render(title1, title2, buttons, canvas=menu)
+        render(phantomSnake, phantomApple, title1, title2, buttons, canvas=menu_screen)
+
+
+pause = False
+
+
+def exit_game():
+    save_score()
+    pygame.quit()
+    sys.exit()
+
+
+def un_pause():
+    global pause
+    pause = False
 
 
 def pause_menu():
-    pass
+    global pause
+    pause = True
 
+    canvas_size = resolution * 12//16, resolution * 10//16
+    canvas_pos = tuple(map(lambda x: (resolution - x)//2, canvas_size))
+    pause_screen = pygame.Surface(canvas_size)
 
-def options():
-    pass
+    frame1 = {'color': (255, 255, 255), 'rect': pygame.Rect(0, 0, canvas_size[0], canvas_size[1])}
+    frame2 = {'color': (0, 0, 0),
+              'rect': pygame.Rect(resolution // 32, resolution // 32, canvas_size[0] * 11//12, canvas_size[1] * 7//8)}
 
+    title = Label("Paused", (canvas_size[0] * 1 // 12, canvas_size[1] * 3//24), main_font(3), color=(0, 255, 0))
 
-def credits_game():  # the credits function already exits
-    pass
+    continueBtn = Button(canvas_size[0] * 1//12, canvas_size[1] * 6//16, 92, 16, label="> Continue", evt_clk=un_pause)
+    optionsBtn = Button(canvas_size[0] * 1//12, canvas_size[1] * 8//16, 82, 16, label="> Options", evt_clk=options)
+    menuBtn = Button(canvas_size[0] * 1//12, canvas_size[1] * 10//16, 100, 16, label="> Main Menu", evt_clk=main_menu)
+    exitBtn = Button(canvas_size[0] * 1//12, canvas_size[1] * 12//16, 56, 16, label="> Exit", evt_clk=exit_game)
 
+    buttons = (continueBtn, optionsBtn, menuBtn, exitBtn)
 
-# Game
-def game():
-    game_screen = pygame.Surface((resolution, resolution))
-
-    snake.spawn()
-    apple.new_apple()
-
-    pause_game = False
-    run_game = True
-    while run_game:
+    # Mouse variable declarations
+    mx, my = (0, 0)
+    mClick = False
+    while pause:
         # FPS
-        clock.tick(6)
-
-        # Mouse
-        # mx, my = pygame.mouse.get_pos()
-        # mClick = pygame.mouse.get_pressed()[0]
+        clock.tick(FPS)  # Difficult Progress
 
         # Inputting
         for event in pygame.event.get():
 
             # Exit
             if event.type == pygame.QUIT:
-                save_score()
-                pygame.quit()
-                sys.exit()
+                exit_game()
+
+            # Mouse
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mClick = True
+            if event.type == pygame.MOUSEMOTION:
+                mx, my = map(lambda x, y: x-y, event.pos, canvas_pos)
+
+            # Keyboard
+            if event.type == pygame.KEYDOWN:  # If a key is pressed
+
+                # Play
+                if pygame.key.name(event.key) in ("escape", "space"):
+                    pause = False
+
+        # Collision
+        for button in buttons:
+            button.collision(mx, my, mClick)
+
+        # Render
+        render(frame1, frame2, title, buttons, canvas=pause_screen, canvas_pos=canvas_pos)
+
+
+back = False
+
+
+def go_back():
+    global back
+    back = True
+
+
+def options():
+    global back
+
+    # Buttons
+    backBtn = Button(0, 0, 0, 0, evt_clk=go_back)
+
+    buttons = (backBtn, )
+
+    # Mouse variable declarations
+    mx, my = (0, 0)
+    mClick = False
+
+    while not back:
+        # Inputting
+        for event in pygame.event.get():
+
+            # Exit
+            if event.type == pygame.QUIT:
+                exit_game()
+
+            # Mouse
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mClick = True
+            if event.type == pygame.MOUSEMOTION:
+                mx, my = event.pos
+
+            # Keyboard
+            if event.type == pygame.KEYDOWN:  # If a key is pressed
+
+                # Play
+                if pygame.key.name(event.key) == "escape":
+                    back = True
+
+        for button in buttons:
+            button.collision(mx, my, mClick)
+
+        # Render
+        render(backBtn)
+
+
+def credits_game():  # the credits function already exits
+    return None
+
+
+# Game
+def game():
+    score_screen = pygame.Surface((resolution, resolution * 1//16))
+    game_screen = pygame.Surface((resolution, resolution * 15//16))
+
+    snake.spawn()
+    apple.set_canvas(game_screen)
+    apple.new_apple()
+
+    # Pause Button (Não funciona!!!)
+    pauseBtn = Button(score_screen.get_width() * 15//16, score_screen.get_height() * 1//4,
+                      20, 16, label="II", evt_clk=pause_menu)
+
+    # Mouse variable declarations
+    mx, my = (0, 0)
+    mClick = False
+
+    # pause_game = False
+    run_game = True
+    while run_game:
+        # FPS
+        clock.tick(FPS + (initial_difficult + score-1))
+
+        # Score
+        scoreLbl = Label("Score: " + str(score), (score_screen.get_width() * 1//16, score_screen.get_height() * 1//4),
+                         color=(0, 255, 0))
+        hiScoreLbl = Label("HI: " + str(HI), (score_screen.get_width() * 6//16, score_screen.get_height() * 1//4),
+                           color=(255, 0, 0))
+
+        # Inputting
+        for event in pygame.event.get():
+
+            # Exit
+            if event.type == pygame.QUIT:
+                exit_game()
+
+            # Mouse
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mClick = True
+            if event.type == pygame.MOUSEMOTION:
+                mx, my = event.pos
 
             # Keyboard
             if event.type == pygame.KEYDOWN:  # If a key is pressed
 
                 # print(pygame.key.name(event.key))
 
-                # Play/Pause
-                if pygame.key.name(event.key) in ("escape", "return"):
-                    pause_game = not pause_game
-                    print("pause" if pause_game else "play")
+                # Pause
+                if pygame.key.name(event.key) in ("escape", "space"):
+                    # pause_game = not pause_game
+                    # print("pause" if pause_game else "play")
                     pause_menu()
 
                 # Moves
@@ -468,18 +603,23 @@ def game():
                 except SyntaxError:
                     pass
 
-        if not pause_game:
-            # Move
-            snake.move_head()
+        # Move
+        snake.move_head()
 
-            # Collisions
-            snake.apple_collision(apple)
-            snake.self_collision()
-            snake.edge_collision()
+        # Collisions
+        snake.apple_collision(apple)
+        snake.self_collision()
+        snake.edge_collision((game_screen.get_width(), game_screen.get_height()))
+        pauseBtn.collision(mx, my, mClick)
+
+        # Reset mouse pos and click
+        mClick = False
 
         # Render
-        render((snake, apple), canvas=game_screen)
+        render(scoreLbl, hiScoreLbl, pauseBtn, canvas=score_screen, background=(255, 255, 255))
+        render(snake, apple, canvas=game_screen, canvas_pos=(0, resolution*1//16))
 
 
 # Run!
-main_menu()
+if __name__ == "__main__":
+    main_menu()

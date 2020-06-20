@@ -167,8 +167,8 @@ while runGame:
     screen.blit(apple['skin'], apple['pos'])
 
     # Score Viewer
-    score = font.render(f"Score: {scoreValue}", True, (255, 0, 0))
-    HI = font.render(f"HI: {HIValue}", True, (0, 255, 0))
+    score = font.draw(f"Score: {scoreValue}", True, (255, 0, 0))
+    HI = font.draw(f"HI: {HIValue}", True, (0, 255, 0))
 
     panel = pygame.Surface((320, 32))
     panel.fill((255, 255, 255))
