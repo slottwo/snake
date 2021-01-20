@@ -10,7 +10,7 @@ screen_size = (320, 320)
 screen = pygame.display.set_mode(screen_size)
 pygame.display.set_caption("Snake")
 
-# Game's presets
+# Game presets
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("consolas", 16)
 
@@ -107,7 +107,7 @@ def eat_apple():
     global scoreValue
     if apple["pos"] in snake["pos"]:
         scoreValue += 1
-        print("eat!")
+        print("Chomp")
         snake['pos'].append(snake['pos'][-1])
         new_apple()
 
@@ -134,6 +134,7 @@ def re_spawn():
 
 # Game
 runGame = True
+print("Hi!")
 while runGame:
     # FPS
     clock.tick(6)
@@ -142,6 +143,7 @@ while runGame:
     for event in pygame.event.get():
         # Exit
         if event.type == pygame.QUIT:
+            print("Bye!")
             runGame = False
         # Moves
         if event.type == pygame.KEYDOWN:
@@ -156,6 +158,7 @@ while runGame:
     # Collisions
     eat_apple()
     if self_collision():
+        print("It's hurt!")
         re_spawn()
 
     # Render
@@ -167,8 +170,8 @@ while runGame:
     screen.blit(apple['skin'], apple['pos'])
 
     # Score Viewer
-    score = font.draw(f"Score: {scoreValue}", True, (255, 0, 0))
-    HI = font.draw(f"HI: {HIValue}", True, (0, 255, 0))
+    score = font.render(f"Score: {scoreValue}", True, (255, 0, 0))
+    HI = font.render(f"HI: {HIValue}", True, (0, 255, 0))
 
     panel = pygame.Surface((320, 32))
     panel.fill((255, 255, 255))
