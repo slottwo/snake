@@ -24,6 +24,7 @@ def iterable(obj):
 
 # Boot and game proprieties
 pygame.init()
+print(" Initting ".center(80, "="))
 clock = pygame.time.Clock()  # Game Tick Speed controller
 FPS = 12
 initial_difficult = 1
@@ -73,6 +74,8 @@ def load_score():
 
 
 def save_score():
+    print("Saving...")
+    saved = True
     try:
         file = open(file_name, "rt")
         file.close()
@@ -80,10 +83,12 @@ def save_score():
         print("The score save was lost")
         file = open(file_name, "wt+")
         file.write("0")
+        saved = False
     finally:
         file = open(file_name, "wt")
         file.write(str(HI))
         file.close()
+    return saved
 
 
 file_name = "scoreboard.txt"
@@ -375,10 +380,10 @@ def main_menu():
                    has_rect=True, rect_color=(0, 255, 0))
 
     # Buttons
-    playBtn = Button(resolution * 4//32, resolution * 12//32, 56, 16, label="> Play", evt_clk=game)
-    optionsBtn = Button(resolution * 4//32, resolution * 14//32, 80, 16, label="> Options", evt_clk=options)
-    creditsBtn = Button(resolution * 4//32, resolution * 16//32, 80, 16, label="> Credits", evt_clk=credits_game)
-    exitBtn = Button(resolution * 4//32, resolution * 18//32, 56, 16, label="> Exit", evt_clk=exit_game)
+    playBtn = Button(resolution * 4//32, resolution * 12//32, 60, 16, label="> Play", evt_clk=game)
+    optionsBtn = Button(resolution * 4//32, resolution * 14//32, 92, 16, label="> Options", evt_clk=options)
+    creditsBtn = Button(resolution * 4//32, resolution * 16//32, 92, 16, label="> Credits", evt_clk=credits_game)
+    exitBtn = Button(resolution * 4//32, resolution * 18//32, 60, 16, label="> Exit", evt_clk=exit_game)
 
     buttons = (playBtn, optionsBtn, creditsBtn, exitBtn)
 
@@ -400,6 +405,9 @@ def main_menu():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     mClick = True
+            if event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    mClick = False
             if event.type == pygame.MOUSEMOTION:
                 mx, my = event.pos
 
@@ -423,7 +431,8 @@ pause = False
 
 
 def exit_game():
-    save_score()
+    if save_score():
+        print("Score saved successfully.")
     pygame.quit()
     sys.exit()
 
@@ -456,8 +465,9 @@ def pause_menu():
 
     # Mouse variable declarations
     mx, my = (0, 0)
-    mClick = False
+    
     while pause:
+        mClick = False
         # FPS
         clock.tick(FPS)  # Difficult Progress
 
